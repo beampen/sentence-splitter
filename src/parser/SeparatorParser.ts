@@ -9,7 +9,8 @@ export const DefaultOptions = {
         "?", // question mark
         "!", //  exclamation mark
         "？", // (ja) zenkaku question mark
-        "！" // (ja) zenkaku exclamation mark
+        "！", // (ja) zenkaku exclamation mark
+        "\n"
     ]
 };
 
