@@ -27,6 +27,8 @@ export interface SeparatorParserOptions {
  */
 export class SeparatorParser implements AbstractParser {
     private separatorCharacters: string[];
+    // Pre-define a set of valid next characters for better performance
+    private validNextChars = new Set([" ", "\t", "\r", "\n", '"', "'", "”", "’"]);
 
     constructor(readonly options?: SeparatorParserOptions) {
         this.separatorCharacters =
@@ -48,15 +50,13 @@ export class SeparatorParser implements AbstractParser {
         if (!this.separatorCharacters.includes(firstChar)) {
             return false;
         }
-        // Need space after period or quotation mark after period
+        // Need space after period
         // Example: "This is a pen. This is not a pen."
-        // Example: "This is a pen." This is not a pen.
-        // Example: "This is a pen.' This is not a pen.
         // It will avoid false-position like `1.23`
         if (firstChar === ".") {
             if (nextChar) {
-                // Allow period followed by quote marks or whitespace
-                return /[\s\t\r\n\"\'"]/.test(nextChar);
+                // Use a Set lookup instead of regex for better performance
+                return this.validNextChars.has(nextChar);
             } else {
                 return true;
             }
