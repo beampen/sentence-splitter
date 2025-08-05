@@ -9,7 +9,8 @@ export const DefaultOptions = {
         "?", // question mark
         "!", //  exclamation mark
         "？", // (ja) zenkaku question mark
-        "！" // (ja) zenkaku exclamation mark
+        "！", // (ja) zenkaku exclamation mark
+        "\n"
     ]
 };
 
@@ -47,12 +48,15 @@ export class SeparatorParser implements AbstractParser {
         if (!this.separatorCharacters.includes(firstChar)) {
             return false;
         }
-        // Need space after period
+        // Need space after period or quotation mark after period
         // Example: "This is a pen. This is not a pen."
+        // Example: "This is a pen." This is not a pen.
+        // Example: "This is a pen.' This is not a pen.
         // It will avoid false-position like `1.23`
         if (firstChar === ".") {
             if (nextChar) {
-                return /[\s\t\r\n]/.test(nextChar);
+                // Allow period followed by quote marks or whitespace
+                return /[\s\t\r\n\"\'"]/.test(nextChar);
             } else {
                 return true;
             }
