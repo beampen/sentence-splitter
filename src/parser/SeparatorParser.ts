@@ -27,8 +27,6 @@ export interface SeparatorParserOptions {
  */
 export class SeparatorParser implements AbstractParser {
     private separatorCharacters: string[];
-    // Pre-define a set of valid next characters for better performance
-    private validNextChars = new Set([" ", "\t", "\r", "\n", '"', "'", "”", "’"]);
 
     constructor(readonly options?: SeparatorParserOptions) {
         this.separatorCharacters =
@@ -55,8 +53,7 @@ export class SeparatorParser implements AbstractParser {
         // It will avoid false-position like `1.23`
         if (firstChar === ".") {
             if (nextChar) {
-                // Use a Set lookup instead of regex for better performance
-                return this.validNextChars.has(nextChar);
+                return /[\s\t\r\n]/.test(nextChar);
             } else {
                 return true;
             }
