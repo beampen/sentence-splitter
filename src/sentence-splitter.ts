@@ -175,6 +175,11 @@ export interface splitOptions {
      */
     SeparatorParser?: SeparatorParserOptions;
     AbbrMarker?: AbbrMarkerOptions;
+    /**
+     * Poetry mode - when true, single newlines don't break sentences
+     * Double newlines will still break sentences
+     */
+    poetryMode?: boolean;
 }
 
 const createParsers = (options: splitOptions = {}) => {
@@ -199,15 +204,38 @@ const createParsers = (options: splitOptions = {}) => {
 };
 
 /**
+ * Check if there are multiple consecutive newlines in the source code
+ */
+function hasMultipleNewlines(sourceCode: SourceCode): boolean {
+    const currentPosition = sourceCode.now();
+    const text = sourceCode.text;
+
+    // Check if we have at least two consecutive newlines
+    const nextChars = text.substring(currentPosition.offset, currentPosition.offset + 4);
+    return nextChars.includes("\n\n") || nextChars.includes("\r\n\r\n");
+}
+
+/**
  * split `text` into Sentence nodes
  */
 export function split(text: string, options?: splitOptions): TxtParentNodeWithSentenceNode["children"] {
     const { newLine, space, separator, anyValueParser } = createParsers(options);
+    const poetryMode = options?.poetryMode || false;
     const splitParser = new SplitParser(text);
     const sourceCode = splitParser.source;
     while (!sourceCode.hasEnd) {
         if (newLine.test(sourceCode)) {
-            splitParser.close(newLine);
+            if (poetryMode) {
+                // In poetry mode, check for multiple newlines
+                if (hasMultipleNewlines(sourceCode)) {
+                    splitParser.close(newLine);
+                } else {
+                    splitParser.nextLine(newLine);
+                }
+            } else {
+                // In prose mode (default), any newline closes the sentence
+                splitParser.close(newLine);
+            }
         } else if (space.test(sourceCode)) {
             splitParser.nextSpace(space);
         } else if (separator.test(sourceCode)) {
@@ -230,6 +258,7 @@ export function split(text: string, options?: splitOptions): TxtParentNodeWithSe
  */
 export function splitAST(paragraphNode: TxtParagraphNode, options?: splitOptions): TxtParentNodeWithSentenceNode {
     const { newLine, space, separator, anyValueParser } = createParsers(options);
+    const poetryMode = options?.poetryMode || false;
     const splitParser = new SplitParser(paragraphNode);
     const sourceCode = splitParser.source;
     while (!sourceCode.hasEnd) {
@@ -246,7 +275,17 @@ export function splitAST(paragraphNode: TxtParagraphNode, options?: splitOptions
                 splitParser.close(separator);
             } else if (newLine.test(sourceCode)) {
                 nodeLog("newline", sourceCode);
-                splitParser.nextLine(newLine);
+                if (poetryMode) {
+                    // In poetry mode, check for multiple newlines
+                    if (hasMultipleNewlines(sourceCode)) {
+                        splitParser.close(newLine);
+                    } else {
+                        splitParser.nextLine(newLine);
+                    }
+                } else {
+                    // In prose mode (default), any newline closes the sentence
+                    splitParser.close(newLine);
+                }
             } else {
                 if (!splitParser.isOpened()) {
                     nodeLog("open -> createEmptySentenceNode()");
@@ -261,6 +300,17 @@ export function splitAST(paragraphNode: TxtParagraphNode, options?: splitOptions
             // https://github.com/azu/sentence-splitter/issues/23
             splitParser.pushNodeToCurrent(currentNode);
             sourceCode.peekNode(currentNode);
+
+            // In poetry mode, we might want to consider if this is a significant break
+            // that should end the sentence
+            if (poetryMode) {
+                // If this is a Break node and there's another Break node right after it,
+                // we can consider it a paragraph break and close the sentence
+                const nextNode = sourceCode.peekNextNode();
+                if (nextNode && nextNode.type === ASTNodeTypes.Break) {
+                    splitParser.close(space);
+                }
+            }
         } else {
             if (!splitParser.isOpened()) {
                 nodeLog("open -> createEmptySentenceNode()");
